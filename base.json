@@ -1,0 +1,28 @@
+{
+  "builders": [
+    {
+      "type": "googlecompute",
+      "account_file": "account.json",
+      "project_id": "packer-example-project",
+      "source_image_family": "centos-7",
+      "ssh_username": "packer",
+      "image_name": "packer-example-{{timestamp}}",
+      "zone": "asia-northeast1-a"
+    }
+  ],
+  "provisioners": [
+    {
+      "type": "shell",
+      "inline": [
+        "sudo yum -y update",
+        "sudo yum -y --enablerepo=epel install ansible",
+        "sudo sed -i '/sftp-server$/s/$/ -e/' /etc/ssh/sshd_config",
+        "sudo systemctl restart sshd"
+      ]
+    },
+    {
+      "type": "ansible",
+      "playbook_file": "ansible.yml"
+    }
+  ]
+}

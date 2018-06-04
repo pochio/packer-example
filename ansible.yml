@@ -1,0 +1,47 @@
+- hosts: all
+  become: true
+  vars:
+    project_id: packer-example-project
+    region: asia-northeast1
+    cloudsql_name : packer-example-cloudsql-master
+  tasks:
+    - name: install apache
+      yum: name=httpd
+    - name: create index.html
+      shell: echo "Hello World!" > /var/www/html/index.html
+    - name: apache restart
+      service: name=httpd state=restarted enabled=yes
+    - name: install mysql
+      yum: name=mysql
+    - name: Download file and force basic auth
+      get_url: url=https://dl.google.com/cloudsql/cloud_sql_proxy.linux.amd64
+               dest=/usr/local/bin/cloud_sql_proxy
+    - name: chmod cloud_sql_proxy
+      file: path=/usr/local/bin/cloud_sql_proxy
+            owner=root group=root mode=0755
+    - name: create systemd.service file
+      blockinfile:
+        path: /etc/systemd/system/cloudsql-proxy.service
+        create: yes
+        block: |
+          [Unit]
+          Description = CloudSQL Proxy Default
+          After = network.target
+
+          [Service]
+          ExecStart = /usr/local/bin/cloud_sql_proxy -instances={{ project_id }}:{{ region }}:{{ cloudsql_name }}=tcp:3306
+          ExecStop = /bin/kill ${MAINPID}
+          ExecReload = /bin/kill -HUP ${MAINPID}
+          Restart = always
+          Type = simple
+
+          LimitNOFILE=65535
+          LimitNPROC=65535
+
+          [Install]
+          WantedBy = multi-user.target
+    - name: systemctl reload
+      systemd: daemon_reload=yes
+    - name: start cloudsql-proxy
+      service: name=cloudsql-proxy state=restarted enabled=yes
+
